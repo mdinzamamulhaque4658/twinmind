@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TwinMind — Live Suggestions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,400&display=swap" rel="stylesheet" />
+<style>
+/* ── Design tokens ──────────────────────────────────────────────────────── */
+:root {
+  --bg: #0a0b0d;
+  --surface: #111318;
+  --surface2: #181b22;
+  --border: rgba(255,255,255,0.07);
+  --border-active: rgba(99,179,237,0.4);
+  --text: #e8eaf0;
+  --text-muted: #6b7280;
+  --text-dim: #4b5563;
+  --accent: #63b3ed;
+  --accent2: #9f7aea;
+  --accent3: #68d391;
+  --accent4: #f6ad55;
+  --danger: #fc8181;
+  --live: #fc8181;
+  --card-hover: rgba(99,179,237,0.05);
+  --radius: 10px;
+  --radius-sm: 6px;
+  --font-head: 'Syne', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+  --col-w: calc((100vw - 64px) / 3);
+}
+
+/* ── Reset ──────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Top bar ────────────────────────────────────────────────────────────── */
+#topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  height: 52px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+  gap: 12px;
+}
+#logo {
+  font-family: var(--font-head);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#logo span { color: var(--accent); }
+#logo-dot {
+  width: 8px; height: 8px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: inline-block;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%,100% { opacity:1; transform:scale(1); }
+  50% { opacity:0.5; transform:scale(0.75); }
+}
+#topbar-actions { display: flex; gap: 8px; align-items: center; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  transition: all 0.15s;
+}
+.btn:hover { border-color: var(--border-active); color: var(--text); }
+.btn-primary {
+  background: var(--accent);
+  color: #0a0b0d;
+  border-color: transparent;
+  font-weight: 600;
+}
+.btn-primary:hover { background: #90cdf4; color: #0a0b0d; }
+.btn-danger { border-color: rgba(252,129,129,0.3); color: var(--danger); }
+.btn-danger:hover { background: rgba(252,129,129,0.08); }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+
+/* ── Status badge ───────────────────────────────────────────────────────── */
+#status-badge {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+#status-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--text-dim);
+  transition: background 0.3s;
+}
+#status-dot.live { background: var(--live); animation: blink 1s step-start infinite; }
+#status-dot.ready { background: var(--accent3); }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ── Main 3-col layout ──────────────────────────────────────────────────── */
+#main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  gap: 0;
+}
+.col {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+}
+.col:last-child { border-right: none; }
+#col-transcript { width: var(--col-w); flex-shrink: 0; }
+#col-suggestions { width: var(--col-w); flex-shrink: 0; }
+#col-chat { flex: 1; }
+
+/* ── Column headers ─────────────────────────────────────────────────────── */
+.col-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.col-title {
+  font-family: var(--font-head);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.col-actions { display: flex; gap: 6px; align-items: center; }
+
+/* ── Transcript ─────────────────────────────────────────────────────────── */
+#transcript-body {
+  flex: 1; overflow-y: auto; padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.transcript-chunk {
+  padding: 10px 14px;
+  background: var(--surface2);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  font-size: 13.5px;
+  color: var(--text);
+  line-height: 1.65;
+  animation: fade-in 0.3s ease;
+}
+.transcript-chunk .chunk-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+.transcript-chunk.latest { border-color: rgba(99,179,237,0.2); }
+#transcript-empty {
+  color: var(--text-dim);
+  font-size: 13px;
+  text-align: center;
+  margin-top: 40px;
+  font-style: italic;
+}
+
+/* ── Mic button ─────────────────────────────────────────────────────────── */
+#mic-section {
+  padding: 14px 18px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+#mic-btn {
+  width: 100%;
+  padding: 11px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-family: var(--font-head);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  transition: all 0.2s;
+}
+#mic-btn:hover { border-color: var(--border-active); }
+#mic-btn.recording {
+  background: rgba(252,129,129,0.1);
+  border-color: rgba(252,129,129,0.4);
+  color: var(--danger);
+}
+#mic-btn svg { flex-shrink: 0; }
+#timer {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+/* ── Suggestions ────────────────────────────────────────────────────────── */
+#suggestions-body {
+  flex: 1; overflow-y: auto; padding: 14px 14px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.suggestion-batch {
+  display: flex; flex-direction: column; gap: 7px;
+  animation: slide-in 0.35s ease;
+}
+.batch-time {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  padding: 0 2px;
+  display: flex; align-items: center; gap: 6px;
+}
+.batch-time::before {
+  content: '';
+  display: inline-block;
+  width: 12px; height: 1px;
+  background: var(--text-dim);
+}
+.suggestion-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.18s;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  position: relative;
+  overflow: hidden;
+}
+.suggestion-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  border-radius: 3px 0 0 3px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.suggestion-card:hover {
+  border-color: var(--border-active);
+  background: var(--card-hover);
+  transform: translateX(2px);
+}
+.suggestion-card:hover::before { opacity: 1; }
+.suggestion-card[data-type="question"]::before { background: var(--accent); }
+.suggestion-card[data-type="talking_point"]::before { background: var(--accent3); }
+.suggestion-card[data-type="answer"]::before { background: var(--accent2); }
+.suggestion-card[data-type="fact_check"]::before { background: var(--accent4); }
+.suggestion-card[data-type="clarification"]::before { background: var(--danger); }
+.card-type-tag {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 7px;
+  border-radius: 3px;
+  display: inline-block;
+  width: fit-content;
+}
+.tag-question { background: rgba(99,179,237,0.12); color: var(--accent); }
+.tag-talking_point { background: rgba(104,211,145,0.12); color: var(--accent3); }
+.tag-answer { background: rgba(159,122,234,0.12); color: var(--accent2); }
+.tag-fact_check { background: rgba(246,173,85,0.12); color: var(--accent4); }
+.tag-clarification { background: rgba(252,129,129,0.12); color: var(--danger); }
+.card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  font-family: var(--font-head);
+  line-height: 1.4;
+}
+.card-preview {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+#suggestions-empty {
+  color: var(--text-dim);
+  font-size: 13px;
+  text-align: center;
+  margin-top: 40px;
+  font-style: italic;
+  padding: 0 16px;
+}
+#suggestions-loading {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+#suggestions-loading.show { display: flex; }
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fade-in { from { opacity:0; } to { opacity:1; } }
+@keyframes slide-in { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+
+/* ── Chat ───────────────────────────────────────────────────────────────── */
+#chat-body {
+  flex: 1; overflow-y: auto; padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+#chat-empty {
+  color: var(--text-dim); font-size: 13px;
+  text-align: center; margin-top: 40px;
+  font-style: italic;
+}
+.chat-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  animation: fade-in 0.25s ease;
+  max-width: 92%;
+}
+.chat-msg.user { align-self: flex-end; }
+.chat-msg.assistant { align-self: flex-start; }
+.chat-bubble {
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+.chat-msg.user .chat-bubble {
+  background: rgba(99,179,237,0.12);
+  border: 1px solid rgba(99,179,237,0.25);
+  color: var(--text);
+  border-radius: var(--radius) var(--radius) 4px var(--radius);
+}
+.chat-msg.assistant .chat-bubble {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius) var(--radius) var(--radius) 4px;
+}
+.chat-msg-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  padding: 0 4px;
+}
+.chat-msg.user .chat-msg-meta { text-align: right; }
+
+/* Markdown in chat */
+.chat-bubble strong { color: var(--text); font-weight: 600; }
+.chat-bubble em { color: var(--text-muted); }
+.chat-bubble code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: rgba(255,255,255,0.06);
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--accent);
+}
+.chat-bubble p { margin-bottom: 6px; }
+.chat-bubble p:last-child { margin-bottom: 0; }
+.chat-bubble ul, .chat-bubble ol { padding-left: 18px; margin: 6px 0; }
+.chat-bubble li { margin-bottom: 3px; }
+.cursor-blink::after {
+  content: '▋';
+  animation: cursor 0.7s step-start infinite;
+  color: var(--accent);
+}
+@keyframes cursor { 50% { opacity: 0; } }
+
+/* ── Chat input ─────────────────────────────────────────────────────────── */
+#chat-input-section {
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+#chat-input {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  padding: 10px 14px;
+  resize: none;
+  max-height: 120px;
+  transition: border-color 0.2s;
+  outline: none;
+  line-height: 1.5;
+}
+#chat-input:focus { border-color: var(--border-active); }
+#chat-input::placeholder { color: var(--text-dim); }
+#chat-send {
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: #0a0b0d;
+  font-family: var(--font-head);
+  font-size: 13px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  height: 40px;
+}
+#chat-send:hover { background: #90cdf4; }
+#chat-send:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Settings modal ─────────────────────────────────────────────────────── */
+#modal-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+}
+#modal-overlay.open { display: flex; }
+#modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  width: min(700px, 95vw);
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+#modal h2 {
+  font-family: var(--font-head);
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.modal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.modal-section h3 {
+  font-family: var(--font-head);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.field input, .field textarea, .field select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 13px;
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.field input:focus, .field textarea:focus, .field select:focus { border-color: var(--border-active); }
+.field input[type="password"] { font-family: var(--font-mono); }
+.field textarea { resize: vertical; min-height: 80px; line-height: 1.6; }
+.field select { cursor: pointer; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 10px; }
+.api-key-note {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}
+
+/* ── Scrollbars ─────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-active); }
+
+/* ── Notification toast ─────────────────────────────────────────────────── */
+#toast {
+  position: fixed;
+  bottom: 20px; left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 18px;
+  font-size: 13px;
+  color: var(--text);
+  z-index: 200;
+  transition: transform 0.3s ease;
+  pointer-events: none;
+}
+#toast.show { transform: translateX(-50%) translateY(0); }
+#toast.error { border-color: rgba(252,129,129,0.4); color: var(--danger); }
+</style>
+</head>
+<body>
+
+<!-- ── Top bar ──────────────────────────────────────────────────────────────── -->
+<div id="topbar">
+  <div id="logo">
+    <span id="logo-dot"></span>
+    Twin<span>Mind</span>
+  </div>
+  <div id="status-badge">
+    <div id="status-dot"></div>
+    <span id="status-text">Idle</span>
+  </div>
+  <div id="topbar-actions">
+    <button class="btn btn-sm" onclick="exportSession()">⬇ Export</button>
+    <button class="btn btn-sm" onclick="openSettings()">⚙ Settings</button>
+  </div>
+</div>
+
+<!-- ── 3-col main ────────────────────────────────────────────────────────────── -->
+<div id="main">
+
+  <!-- Transcript -->
+  <div class="col" id="col-transcript">
+    <div class="col-header">
+      <span class="col-title">Transcript</span>
+    </div>
+    <div id="transcript-body">
+      <div id="transcript-empty">Start recording to see your transcript here.</div>
+    </div>
+    <div id="mic-section">
+      <button id="mic-btn" onclick="toggleMic()">
+        <svg id="mic-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        <span id="mic-label">Start Recording</span>
+      </button>
+      <div id="timer"></div>
+    </div>
+  </div>
+
+  <!-- Suggestions -->
+  <div class="col" id="col-suggestions">
+    <div class="col-header">
+      <span class="col-title">Live Suggestions</span>
+      <div class="col-actions">
+        <span id="refresh-countdown" style="font-family:var(--font-mono);font-size:11px;color:var(--text-dim);display:none;"></span>
+        <button class="btn btn-sm" onclick="manualRefresh()" id="refresh-btn" title="Refresh suggestions">↻ Refresh</button>
+      </div>
+    </div>
+    <div id="suggestions-loading">
+      <div class="spinner"></div>
+      <span>Generating suggestions…</span>
+    </div>
+    <div id="suggestions-body">
+      <div id="suggestions-empty">Suggestions will appear here once you start speaking.</div>
+    </div>
+  </div>
+
+  <!-- Chat -->
+  <div class="col" id="col-chat">
+    <div class="col-header">
+      <span class="col-title">Chat</span>
+    </div>
+    <div id="chat-body">
+      <div id="chat-empty">Click a suggestion or type a question.</div>
+    </div>
+    <div id="chat-input-section">
+      <textarea id="chat-input" rows="1" placeholder="Ask anything about this conversation…" onkeydown="chatKeydown(event)" oninput="autoResize(this)"></textarea>
+      <button id="chat-send" onclick="sendChatMessage()">Send</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Settings modal ────────────────────────────────────────────────────────── -->
+<div id="modal-overlay" onclick="closeSettingsOutside(event)">
+  <div id="modal">
+    <h2>⚙ Settings</h2>
+
+    <div class="modal-section">
+      <h3>API Key</h3>
+      <div class="field">
+        <label>Groq API Key</label>
+        <input type="password" id="s-apikey" placeholder="gsk_..." />
+        <span class="api-key-note">Stored in memory only. Never sent anywhere except Groq.</span>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <h3>Model</h3>
+      <div class="field">
+        <label>LLM Model (suggestions + chat)</label>
+        <select id="s-model">
+          <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile (recommended)</option>
+          <option value="llama3-70b-8192">Llama 3 70B</option>
+          <option value="llama-3.1-70b-versatile">Llama 3.1 70B</option>
+          <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
+          <option value="gemma2-9b-it">Gemma 2 9B</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <h3>Context Windows</h3>
+      <div class="field">
+        <label>Suggestion context (characters of transcript)</label>
+        <input type="number" id="s-suggestion-ctx" value="6000" min="1000" max="30000" step="500" />
+      </div>
+      <div class="field">
+        <label>Chat / expanded answer context (characters of transcript)</label>
+        <input type="number" id="s-chat-ctx" value="12000" min="2000" max="30000" step="500" />
+      </div>
+      <div class="field">
+        <label>Auto-refresh interval (seconds, 0 = off)</label>
+        <input type="number" id="s-interval" value="20" min="0" max="300" step="5" />
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <h3>Suggestion Prompt</h3>
+      <div class="field">
+        <label>System prompt for live suggestions</label>
+        <textarea id="s-suggestion-prompt" rows="8"></textarea>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <h3>Chat Prompt</h3>
+      <div class="field">
+        <label>System prompt for chat / expanded answers</label>
+        <textarea id="s-chat-prompt" rows="6"></textarea>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn" onclick="closeSettings()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ── Default prompts ────────────────────────────────────────────────────────────
+const DEFAULT_SUGGESTION_PROMPT = `You are an expert meeting copilot. Your job is to surface the 3 most useful, context-aware suggestions to help the participant RIGHT NOW based on the live meeting transcript.
+
+Suggestion types you may generate (pick what fits best for the moment):
+- "question": A sharp, relevant question the participant should ask next. Use when the conversation has a gap, ambiguity, or unexplored angle.
+- "talking_point": A key fact, argument, or point the participant should raise. Use when there's an opportunity to add value.
+- "answer": A direct answer to a question that was just asked in the conversation. Use when someone in the transcript asked something that wasn't fully answered.
+- "fact_check": Flag a statement made that seems inaccurate, exaggerated, or worth verifying. Provide the correction or context.
+- "clarification": A concept, term, or claim in the conversation that would benefit from a clear, concise definition or expansion.
+
+Selection rules:
+- Read the LAST ~2-3 minutes of transcript carefully.
+- Surface suggestions that are genuinely useful RIGHT NOW — not generic advice.
+- Vary the types: don't give 3 questions or 3 talking points. Mix them based on what's actually happening.
+- Each suggestion must be immediately actionable or informative.
+- If a direct question was just asked, prioritize an "answer" type.
+- If a questionable claim was made, prioritize "fact_check".
+- The "preview" field must deliver standalone value — it should be informative enough to be useful even without clicking.
+
+Respond ONLY with valid JSON in this exact format:
+{
+  "suggestions": [
+    {
+      "type": "question|talking_point|answer|fact_check|clarification",
+      "title": "Short, punchy headline (under 10 words)",
+      "preview": "1-2 sentence insight or mini-answer. Must be standalone-useful.",
+      "detail_prompt": "A natural, specific question or instruction to send to the chat AI for a fuller answer. Include relevant context from the transcript."
+    }
+  ]
+}`;
+
+const DEFAULT_CHAT_PROMPT = `You are an expert meeting assistant with deep knowledge across business, technology, science, and strategy. You have been provided the full transcript of the ongoing meeting as context.
+
+Your role is to give thorough, specific, immediately useful answers. When answering:
+- Be direct and concrete. Lead with the answer, then explain.
+- Use bullet points and structure when it helps clarity.
+- Reference specific things said in the transcript when relevant.
+- If asked for a talking point, make it polished and ready to say.
+- If asked for a fact-check, be precise about what is accurate and what isn't.
+- Keep answers focused and scannable — the user is in a live meeting.
+- Use markdown formatting: **bold** for key terms, bullet lists for multiple items, \`code\` for technical terms.`;
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let settings = {
+  apiKey: "",
+  model: "llama-3.3-70b-versatile",
+  suggestionPrompt: DEFAULT_SUGGESTION_PROMPT,
+  chatPrompt: DEFAULT_CHAT_PROMPT,
+  suggestionCtx: 6000,
+  chatCtx: 12000,
+  interval: 20,
+};
+
+let state = {
+  recording: false,
+  mediaRecorder: null,
+  audioChunks: [],
+  fullTranscript: "",
+  transcriptChunks: [],
+  suggestionBatches: [],
+  chatHistory: [],
+  timerInterval: null,
+  refreshInterval: null,
+  _countdownInterval: null,
+  _nextRefreshAt: null,
+  recordingSeconds: 0,
+  chunkStartTime: null,
+  chatStreaming: false,
+  sessionStart: new Date(),
+};
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+window.addEventListener("DOMContentLoaded", () => {
+  const saved = localStorage.getItem("tm_settings");
+  if (saved) {
+    try { Object.assign(settings, JSON.parse(saved)); } catch {}
+  }
+  if (!settings.apiKey) {
+    setTimeout(openSettings, 300);
+  }
+});
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function showToast(msg, isError = false) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.className = "show" + (isError ? " error" : "");
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.className = "", 3000);
+}
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+function openSettings() {
+  document.getElementById("s-apikey").value = settings.apiKey;
+  document.getElementById("s-model").value = settings.model;
+  document.getElementById("s-suggestion-ctx").value = settings.suggestionCtx;
+  document.getElementById("s-chat-ctx").value = settings.chatCtx;
+  document.getElementById("s-interval").value = settings.interval;
+  document.getElementById("s-suggestion-prompt").value = settings.suggestionPrompt;
+  document.getElementById("s-chat-prompt").value = settings.chatPrompt;
+  document.getElementById("modal-overlay").classList.add("open");
+}
+function closeSettings() {
+  document.getElementById("modal-overlay").classList.remove("open");
+}
+function closeSettingsOutside(e) {
+  if (e.target === document.getElementById("modal-overlay")) closeSettings();
+}
+function saveSettings() {
+  settings.apiKey = document.getElementById("s-apikey").value.trim();
+  settings.model = document.getElementById("s-model").value;
+  settings.suggestionCtx = parseInt(document.getElementById("s-suggestion-ctx").value) || 6000;
+  settings.chatCtx = parseInt(document.getElementById("s-chat-ctx").value) || 12000;
+  settings.interval = parseInt(document.getElementById("s-interval").value) || 30;
+  settings.suggestionPrompt = document.getElementById("s-suggestion-prompt").value.trim() || DEFAULT_SUGGESTION_PROMPT;
+  settings.chatPrompt = document.getElementById("s-chat-prompt").value.trim() || DEFAULT_CHAT_PROMPT;
+  localStorage.setItem("tm_settings", JSON.stringify(settings));
+  closeSettings();
+  showToast("Settings saved");
+  scheduleAutoRefresh();
+}
+
+// ── Mic / Recording ───────────────────────────────────────────────────────────
+async function toggleMic() {
+  if (state.recording) {
+    stopRecording();
+  } else {
+    await startRecording();
+  }
+}
+
+async function startRecording() {
+  if (!settings.apiKey) { openSettings(); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    state.mediaRecorder = new MediaRecorder(stream, {
+      mimeType: getSupportedMimeType(),
+    });
+    state.audioChunks = [];
+    state.chunkStartTime = new Date();
+
+    state.mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) state.audioChunks.push(e.data);
+    };
+    state.mediaRecorder.onstop = processAudioChunk;
+    state.mediaRecorder.start();
+    state.recording = true;
+
+    updateMicUI(true);
+    setStatus("live", "Recording");
+    startTimer();
+    scheduleAutoRefresh();
+
+  } catch (err) {
+    showToast("Mic access denied: " + err.message, true);
+  }
+}
+
+function stopRecording() {
+  clearInterval(state.refreshInterval);
+  clearInterval(state._countdownInterval);
+  clearInterval(state.timerInterval);
+  document.getElementById("refresh-countdown").style.display = "none";
+  if (state.mediaRecorder?.state === "recording") state.mediaRecorder.stop();
+  state.recording = false;
+  updateMicUI(false);
+  setStatus("ready", "Stopped");
+}
+
+function getSupportedMimeType() {
+  const types = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/mp4"];
+  return types.find(t => MediaRecorder.isTypeSupported(t)) || "";
+}
+
+async function processAudioChunk() {
+  const chunks = [...state.audioChunks];
+  if (!chunks.length) return;
+
+  const blob = new Blob(chunks, { type: state.mediaRecorder.mimeType || "audio/webm" });
+  if (blob.size < 2000) return; // Skip near-empty chunks
+
+  const chunkTime = state.chunkStartTime || new Date();
+  state.chunkStartTime = new Date();
+
+  try {
+    const fd = new FormData();
+    fd.append("audio", blob, "chunk.webm");
+    const resp = await fetch("/api/transcribe", {
+      method: "POST",
+      headers: { "x-groq-api-key": settings.apiKey },
+      body: fd,
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    if (data.text?.trim()) {
+      addTranscriptChunk(data.text.trim(), chunkTime);
+    }
+  } catch (err) {
+    console.error("Transcription error:", err);
+    showToast("Transcription failed: " + err.message, true);
+  }
+}
+
+function addTranscriptChunk(text, time) {
+  const chunk = { text, time: time || new Date() };
+  state.transcriptChunks.push(chunk);
+  state.fullTranscript += (state.fullTranscript ? " " : "") + text;
+
+  const body = document.getElementById("transcript-body");
+  const empty = document.getElementById("transcript-empty");
+  if (empty) empty.remove();
+
+  // Un-highlight previous latest
+  body.querySelectorAll(".transcript-chunk.latest").forEach(el => el.classList.remove("latest"));
+
+  const el = document.createElement("div");
+  el.className = "transcript-chunk latest";
+  el.innerHTML = `<div class="chunk-meta">${formatTime(chunk.time)}</div>${escapeHtml(text)}`;
+  body.appendChild(el);
+  body.scrollTop = body.scrollHeight;
+}
+
+// ── Timer ─────────────────────────────────────────────────────────────────────
+function startTimer() {
+  state.recordingSeconds = 0;
+  clearInterval(state.timerInterval);
+  state.timerInterval = setInterval(() => {
+    state.recordingSeconds++;
+    document.getElementById("timer").textContent = formatDuration(state.recordingSeconds);
+  }, 1000);
+}
+
+// ── Suggestions ───────────────────────────────────────────────────────────────
+function scheduleAutoRefresh() {
+  // Clear any existing timers
+  clearInterval(state.refreshInterval);
+  clearInterval(state._countdownInterval);
+
+  const intervalSec = settings.interval;
+  if (intervalSec <= 0) {
+    document.getElementById("refresh-countdown").style.display = "none";
+    return;
+  }
+
+  state._nextRefreshAt = Date.now() + intervalSec * 1000;
+
+  // Countdown display — updates every second
+  const countdownEl = document.getElementById("refresh-countdown");
+  countdownEl.style.display = "inline";
+  state._countdownInterval = setInterval(() => {
+    const remaining = Math.max(0, Math.ceil((state._nextRefreshAt - Date.now()) / 1000));
+    countdownEl.textContent = `↻ ${remaining}s`;
+  }, 500);
+
+  // Main refresh interval
+  state.refreshInterval = setInterval(async () => {
+    if (!state.recording) return;
+    state._nextRefreshAt = Date.now() + intervalSec * 1000;
+    await autoFlushAndSuggest();
+  }, intervalSec * 1000);
+}
+
+// Flush the current audio chunk then fetch suggestions — used by both auto and manual refresh
+async function autoFlushAndSuggest() {
+  // Flush current in-flight audio so transcript is up to date
+  if (state.recording && state.mediaRecorder?.state === "recording") {
+    state.mediaRecorder.stop();
+    // Wait for processAudioChunk to finish (onstop fires synchronously, fetch is async)
+    await new Promise(r => setTimeout(r, 800));
+    if (state.recording) {
+      state.audioChunks = [];
+      state.chunkStartTime = new Date();
+      state.mediaRecorder.start();
+    }
+  }
+  if (state.fullTranscript.trim().length > 30) {
+    await fetchSuggestions();
+  }
+}
+
+async function manualRefresh() {
+  if (!settings.apiKey) { openSettings(); return; }
+  if (state.fullTranscript.trim().length < 10 && !state.recording) {
+    showToast("No transcript yet — start speaking first.");
+    return;
+  }
+  // Reset the auto-refresh countdown so it doesn't double-fire right after manual
+  clearInterval(state.refreshInterval);
+  clearInterval(state._countdownInterval);
+  state._nextRefreshAt = Date.now() + settings.interval * 1000;
+  scheduleAutoRefresh();
+
+  await autoFlushAndSuggest();
+}
+
+async function fetchSuggestions() {
+  const loading = document.getElementById("suggestions-loading");
+  loading.classList.add("show");
+
+  try {
+    const resp = await fetch("/api/suggestions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-groq-api-key": settings.apiKey,
+      },
+      body: JSON.stringify({
+        transcript: state.fullTranscript,
+        systemPrompt: settings.suggestionPrompt,
+        model: settings.model,
+        contextChars: settings.suggestionCtx,
+      }),
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    if (data.suggestions?.length) {
+      renderSuggestionBatch(data.suggestions);
+    }
+  } catch (err) {
+    showToast("Suggestions failed: " + err.message, true);
+  } finally {
+    loading.classList.remove("show");
+  }
+}
+
+function renderSuggestionBatch(suggestions) {
+  const body = document.getElementById("suggestions-body");
+  const empty = document.getElementById("suggestions-empty");
+  if (empty) empty.remove();
+
+  state.suggestionBatches.unshift({ time: new Date(), suggestions });
+
+  const batch = document.createElement("div");
+  batch.className = "suggestion-batch";
+
+  const timeEl = document.createElement("div");
+  timeEl.className = "batch-time";
+  timeEl.textContent = formatTime(new Date());
+  batch.appendChild(timeEl);
+
+  suggestions.forEach(s => {
+    const card = document.createElement("div");
+    card.className = "suggestion-card";
+    card.setAttribute("data-type", s.type);
+    const tagClass = `tag-${s.type}`;
+    const typeLabel = { question: "Question", talking_point: "Talking Point", answer: "Answer", fact_check: "Fact Check", clarification: "Clarification" }[s.type] || s.type;
+    card.innerHTML = `
+      <span class="card-type-tag ${tagClass}">${typeLabel}</span>
+      <div class="card-title">${escapeHtml(s.title)}</div>
+      <div class="card-preview">${escapeHtml(s.preview)}</div>
+    `;
+    card.onclick = () => clickSuggestion(s);
+    batch.appendChild(card);
+  });
+
+  // Insert at top (below any loading indicator)
+  body.insertBefore(batch, body.firstChild);
+}
+
+function clickSuggestion(s) {
+  const prompt = s.detail_prompt || `Tell me more about: ${s.title}`;
+  sendChatMessage(prompt, `[${s.title}] ${s.preview}`);
+}
+
+// ── Chat ──────────────────────────────────────────────────────────────────────
+function chatKeydown(e) {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendChatMessage();
+  }
+}
+
+function autoResize(el) {
+  el.style.height = "auto";
+  el.style.height = Math.min(el.scrollHeight, 120) + "px";
+}
+
+async function sendChatMessage(overrideText, displayText) {
+  if (state.chatStreaming) return;
+  if (!settings.apiKey) { openSettings(); return; }
+
+  const input = document.getElementById("chat-input");
+  const text = overrideText || input.value.trim();
+  if (!text) return;
+
+  const display = displayText || text;
+  input.value = "";
+  autoResize(input);
+
+  const empty = document.getElementById("chat-empty");
+  if (empty) empty.remove();
+
+  appendChatMessage("user", display);
+  state.chatHistory.push({ role: "user", content: text });
+
+  const assistantDiv = appendChatMessage("assistant", "", true);
+  state.chatStreaming = true;
+  document.getElementById("chat-send").disabled = true;
+
+  let fullReply = "";
+
+  try {
+    const resp = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-groq-api-key": settings.apiKey,
+      },
+      body: JSON.stringify({
+        messages: state.chatHistory,
+        systemPrompt: settings.chatPrompt,
+        transcript: state.fullTranscript,
+        model: settings.model,
+        contextChars: settings.chatCtx,
+      }),
+    });
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    const bubble = assistantDiv.querySelector(".chat-bubble");
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value);
+      const lines = chunk.split("\n");
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const payload = line.slice(6).trim();
+        if (payload === "[DONE]") break;
+        try {
+          const parsed = JSON.parse(payload);
+          if (parsed.error) throw new Error(parsed.error);
+          const delta = parsed.choices?.[0]?.delta?.content || "";
+          fullReply += delta;
+          bubble.innerHTML = renderMarkdown(fullReply);
+          bubble.classList.add("cursor-blink");
+          const chatBody = document.getElementById("chat-body");
+          chatBody.scrollTop = chatBody.scrollHeight;
+        } catch {}
+      }
+    }
+    assistantDiv.querySelector(".chat-bubble").classList.remove("cursor-blink");
+    state.chatHistory.push({ role: "assistant", content: fullReply });
+  } catch (err) {
+    assistantDiv.querySelector(".chat-bubble").textContent = "Error: " + err.message;
+    assistantDiv.querySelector(".chat-bubble").classList.remove("cursor-blink");
+    showToast("Chat error: " + err.message, true);
+  } finally {
+    state.chatStreaming = false;
+    document.getElementById("chat-send").disabled = false;
+  }
+}
+
+function appendChatMessage(role, text, streaming = false) {
+  const body = document.getElementById("chat-body");
+  const div = document.createElement("div");
+  div.className = `chat-msg ${role}`;
+  div.innerHTML = `
+    <div class="chat-bubble">${role === "assistant" ? renderMarkdown(text) : escapeHtml(text)}</div>
+    <div class="chat-msg-meta">${formatTime(new Date())}</div>
+  `;
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+  return div;
+}
+
+// ── Simple markdown renderer ──────────────────────────────────────────────────
+function renderMarkdown(text) {
+  return text
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/`(.+?)`/g, "<code>$1</code>")
+    .replace(/^### (.+)$/gm, "<h4 style='font-family:var(--font-head);font-size:13px;margin:8px 0 4px;color:var(--text)'>$1</h4>")
+    .replace(/^## (.+)$/gm, "<h3 style='font-family:var(--font-head);font-size:14px;margin:10px 0 4px;color:var(--text)'>$1</h3>")
+    .replace(/^- (.+)$/gm, "<li>$1</li>")
+    .replace(/(<li>.*<\/li>(\n|$))+/gs, match => `<ul>${match}</ul>`)
+    .replace(/\n\n/g, "</p><p>")
+    .replace(/^(?!<[hul])(.+)$/gm, (m) => m.trim() ? m : "")
+    .replace(/\n/g, "<br/>")
+    .replace(/^(.+)$/, "<p>$1</p>");
+}
+
+// ── Export ────────────────────────────────────────────────────────────────────
+function exportSession() {
+  const ts = (d) => d instanceof Date ? d.toISOString() : new Date(d).toISOString();
+  const session = {
+    exportedAt: ts(new Date()),
+    sessionStart: ts(state.sessionStart),
+    transcript: state.transcriptChunks.map(c => ({
+      time: ts(c.time),
+      text: c.text,
+    })),
+    fullTranscript: state.fullTranscript,
+    suggestionBatches: state.suggestionBatches.map(b => ({
+      time: ts(b.time),
+      suggestions: b.suggestions,
+    })),
+    chatHistory: state.chatHistory,
+  };
+
+  const blob = new Blob([JSON.stringify(session, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `twinmind-session-${new Date().toISOString().slice(0,19).replace(/:/g,"-")}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast("Session exported");
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+function updateMicUI(recording) {
+  const btn = document.getElementById("mic-btn");
+  const label = document.getElementById("mic-label");
+  if (recording) {
+    btn.classList.add("recording");
+    label.textContent = "Stop Recording";
+  } else {
+    btn.classList.remove("recording");
+    label.textContent = "Start Recording";
+    document.getElementById("timer").textContent = "";
+  }
+}
+
+function setStatus(type, text) {
+  const dot = document.getElementById("status-dot");
+  const label = document.getElementById("status-text");
+  dot.className = type;
+  label.textContent = text;
+}
+
+function formatTime(d) {
+  return (d instanceof Date ? d : new Date(d)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+function formatDuration(s) {
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;
+}
+function escapeHtml(t) {
+  return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+</script>
+</body>
+</html>
