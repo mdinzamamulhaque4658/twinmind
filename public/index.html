@@ -894,8 +894,15 @@ async function processAudioChunk() {
 
 function addTranscriptChunk(text, time) {
   const chunk = { text, time: time || new Date() };
+  const isFirstChunk = state.transcriptChunks.length === 0;
   state.transcriptChunks.push(chunk);
   state.fullTranscript += (state.fullTranscript ? " " : "") + text;
+
+  // First chunk: fire suggestions immediately, then reset the 20s interval from now
+  if (isFirstChunk && state.fullTranscript.trim().length > 30) {
+    scheduleAutoRefresh();   // resets countdown to 20s from now
+    fetchSuggestions();      // fire immediately — no waiting
+  }
 
   const body = document.getElementById("transcript-body");
   const empty = document.getElementById("transcript-empty");
